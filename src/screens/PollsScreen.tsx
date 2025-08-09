@@ -8,6 +8,7 @@ import {
     Platform,
     ScrollView,
     Modal,
+    Alert,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -17,10 +18,13 @@ import { auth, db } from "../firebase";
 import { Poll } from "../types";
 import {
     collection,
+    deleteDoc,
     doc,
+    getDocs,
     onSnapshot,
     setDoc,
     updateDoc,
+    writeBatch,
 } from "firebase/firestore";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { EventTabParamList } from "./EventTabs";
@@ -37,7 +41,7 @@ export default function PollsScreen({
     const [options, setOptions] = useState<string[]>(["", ""]); // dynamic up to 4
     const [polls, setPolls] = useState<Poll[]>([]);
     const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
-    const maxOptions = 4;
+    const maxOptions = 10;
 
     const headerHeight = useHeaderHeight();
     const tabBarHeight = useBottomTabBarHeight();
@@ -136,7 +140,7 @@ export default function PollsScreen({
                         style={[styles.addBtn, options.length >= maxOptions && { opacity: 0.5 }]}
                     >
                         <Text style={styles.addTxt}>
-                            {options.length >= maxOptions ? "Max 4 options" : "+ Add option"}
+                            {options.length >= maxOptions ? "Max 10 options" : "+ Add option"}
                         </Text>
                     </TouchableOpacity>
 
@@ -197,6 +201,22 @@ function PollItem({
     }, [eventId, poll.id]);
 
     const isCreator = auth.currentUser?.uid === poll.createdBy;
+    // put this helper in the same file (outside the component)
+    async function deletePollWithVotes(eventId: string, pollId: string) {
+        const votesRef = collection(db, `events/${eventId}/polls/${pollId}/votes`);
+        const votesSnap = await getDocs(votesRef);
+
+        // chunked batch delete (Firestore limit ~500 ops)
+        const CHUNK = 450;
+        const docs = votesSnap.docs;
+        for (let i = 0; i < docs.length; i += CHUNK) {
+            const batch = writeBatch(db);
+            for (const d of docs.slice(i, i + CHUNK)) batch.delete(d.ref);
+            await batch.commit();
+        }
+
+        await deleteDoc(doc(db, `events/${eventId}/polls/${pollId}`));
+    }
 
     async function vote(optionId: string) {
         await setDoc(
@@ -206,8 +226,10 @@ function PollItem({
     }
 
     return (
+        // inside your render (replace your block with this)
         <View style={styles.poll}>
             <Text style={styles.question}>{poll.question}</Text>
+
             {poll.options.map((o) => {
                 const n = counts[o.id] || 0;
                 const selected = myVote === o.id;
@@ -217,21 +239,55 @@ function PollItem({
                         style={[styles.opt, selected && { borderColor: "#3b82f6" }]}
                     >
                         <Text style={{ flex: 1 }}>{o.text}</Text>
-                        <PrimaryButton
-                            title={selected ? "Voted" : "Vote"}
-                            onPress={() => vote(o.id)}
-                        />
+                        <PrimaryButton title={selected ? "Voted" : "Vote"} onPress={() => vote(o.id)} />
                         <Text style={{ marginLeft: 8 }}>{n}</Text>
                     </View>
                 );
             })}
 
             {isCreator && (
-                <TouchableOpacity onPress={() => onEdit(poll)} style={{ marginTop: 8 }}>
-                    <Text style={{ color: "#2563eb", fontWeight: "600" }}>Edit poll</Text>
-                </TouchableOpacity>
+                <View
+                    style={{
+                        marginTop: 8,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                    }}
+                >
+                    <TouchableOpacity onPress={() => onEdit(poll)}>
+                        <Text style={{ color: "#2563eb", fontWeight: "600" }}>Edit poll</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() =>
+                            Alert.alert(
+                                "Delete poll?",
+                                "This will remove the poll and all its votes. This action cannot be undone.",
+                                [
+                                    { text: "Cancel", style: "cancel" },
+                                    {
+                                        text: "Delete",
+                                        style: "destructive",
+                                        onPress: async () => {
+                                            try {
+                                                await deletePollWithVotes(eventId, poll.id);
+                                            } catch (e) {
+                                                console.error(e);
+                                                Alert.alert("Error", "Could not delete the poll. Please try again.");
+                                            }
+                                        },
+                                    },
+                                ]
+                            )
+                        }
+                    >
+                        <Text style={{ color: "#dc2626", fontWeight: "700" }}>Delete poll</Text>
+                    </TouchableOpacity>
+                </View>
             )}
+
         </View>
+
     );
 }
 
@@ -249,7 +305,7 @@ function EditPollModal({
     const [question, setQuestion] = useState(poll?.question ?? "");
     const [options, setOptions] = useState(poll?.options ?? []);
     const [hasVotes, setHasVotes] = useState(false);
-    const maxOptions = 4;
+    const maxOptions = 10;
 
     useEffect(() => {
         if (!poll) return;
@@ -328,7 +384,7 @@ function EditPollModal({
                                 style={{ marginBottom: 8 }}
                             >
                                 <Text style={{ color: "#2563eb", fontWeight: "600" }}>
-                                    {options.length >= maxOptions ? "Max 4 options" : "+ Add option"}
+                                    {options.length >= maxOptions ? "Max 10 options" : "+ Add option"}
                                 </Text>
                             </TouchableOpacity>
                         )}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, FlatList } from "react-native";
+import { View, Text, FlatList, ScrollView, useWindowDimensions } from "react-native";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { Poll } from "../types";
@@ -67,22 +67,55 @@ function wrapLabel(text: string, maxLineLen = 12) {
 }
 
 function PollChart({ poll, counts }: { poll: Poll; counts: Record<string, number> }) {
-    const data = poll.options.map((o) => ({ option: o.text, votes: counts[o.id] || 0 }));
+    const data = poll.options.map(o => ({ option: o.text, votes: counts[o.id] || 0 }));
+    const { width: screenWidth } = useWindowDimensions();
+
+    // Tune these to taste
+    const BAR_WIDTH = 36;
+    const GAP = 12;
+    const LEFT_RIGHT_PADDING = 40;
+    const CHART_HEIGHT = 240;
+
+    const barsArea =
+        data.length > 0 ? data.length * BAR_WIDTH + (data.length - 1) * GAP : 0;
+
+    // Chart should be at least screen width; expands when there are many items
+    const chartWidth = Math.max(
+        screenWidth - 32, // account for parent padding if any
+        LEFT_RIGHT_PADDING * 2 + barsArea
+    );
+
     return (
         <View style={{ marginBottom: 24 }}>
             <Text style={{ fontWeight: "700", marginBottom: 8 }}>{poll.question}</Text>
-            <VictoryChart
-                domainPadding={{ x: [30, 30], y: 20 }}
-                padding={{ top: 10, right: 20, bottom: 110, left: 40 }} // extra space for multi-line labels
+
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator
+                contentContainerStyle={{ paddingBottom: 8 }}
             >
-                <VictoryAxis
-                    tickFormat={(t) => (typeof t === "string" ? wrapLabel(t, 12) : t)}
-                    tickLabelComponent={<VictoryLabel angle={0} dy={6} />}
-                    style={{ tickLabels: { fontSize: 12 } }}
-                />
-                <VictoryAxis dependentAxis style={{ tickLabels: { fontSize: 12 } }} />
-                <VictoryBar data={data} x="option" y="votes" />
-            </VictoryChart>
+                <View style={{ width: chartWidth }}>
+                    <VictoryChart
+                        width={chartWidth}
+                        height={CHART_HEIGHT}
+                        domainPadding={{ x: [LEFT_RIGHT_PADDING, LEFT_RIGHT_PADDING], y: 20 }}
+                    >
+                        <VictoryAxis
+                            tickFormat={(t) => (typeof t === "string" ? t.slice(0, 12) : String(t))}
+                            style={{ tickLabels: { angle: 0 } }}
+                        />
+                        <VictoryAxis dependentAxis />
+                        <VictoryBar
+                            data={data}
+                            x="option"
+                            y="votes"
+                            barWidth={BAR_WIDTH}
+                            // evenly space bars by inserting categorical padding via styles
+                            style={{ data: { width: BAR_WIDTH } }}
+                        />
+                    </VictoryChart>
+                </View>
+            </ScrollView>
         </View>
     );
 }
