@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { View, Text, FlatList, Alert } from "react-native";
 import { auth, db } from "../firebase";
 import { Attendee } from "../types";
-import { collection, doc, getDocs, onSnapshot, query, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, onSnapshot, query, setDoc, where } from "firebase/firestore";
 import PersonCard from "../components/PersonCard";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { EventTabParamList } from "./EventTabs";
@@ -12,15 +12,21 @@ export default function PeopleScreen({ route }: BottomTabScreenProps<EventTabPar
     const [people, setPeople] = useState<Attendee[]>([]);
 
     useEffect(() => {
-        const q = collection(db, `events/${eventId}/attendees`);
-        const unsub = onSnapshot(q, snap => {
+        // show people seen in the last 5 minutes
+        const cutoff = Date.now() - 5 * 60 * 1000;
+
+        const q = query(
+            collection(db, `events/${eventId}/attendees`),
+            where("lastSeenMs", ">=", cutoff)
+        );
+
+        const unsub = onSnapshot(q, (snap) => {
             const list: Attendee[] = [];
-            snap.forEach(d => list.push(d.data() as Attendee));
+            snap.forEach((d) => list.push(d.data() as Attendee));
             setPeople(list);
         });
         return unsub;
     }, [eventId]);
-
     const others = useMemo(() => people.filter(p => p.uid !== auth.currentUser?.uid), [people]);
 
     async function like(person: Attendee) {

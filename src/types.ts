@@ -13,6 +13,7 @@ export type Profile = {
 
 export type Attendee = Profile & {
     joinedAt: number;
+    lastSeenMs?: number;
 };
 
 export type Poll = {

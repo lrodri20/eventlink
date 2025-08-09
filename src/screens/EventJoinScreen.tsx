@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollVi
 import { useHeaderHeight } from "@react-navigation/elements";
 import TextField from "../components/TextField";
 import PrimaryButton from "../components/PrimaryButton";
-import { collection, doc, getDocs, query, setDoc, where } from "firebase/firestore";
+import { collection, doc, getDocs, query, serverTimestamp, setDoc, Timestamp, where } from "firebase/firestore";
 import { auth, db, ensureAnonAuth } from "../firebase";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
@@ -34,7 +34,10 @@ export default function EventJoinScreen({ navigation }: NativeStackScreenProps<R
         await setDoc(doc(db, `events/${eventId}/attendees/${uid}`), {
             uid,
             displayName: auth.currentUser?.displayName ?? "Anon",
-            joinedAt: Date.now()
+            joinedAt: Date.now(),
+            lastSeen: serverTimestamp(),
+            lastSeenMs: Date.now(),
+            ttl: Timestamp.fromMillis(Date.now() + 5 * 60 * 1000) // match your hook
         }, { merge: true });
         navigation.replace("Event", { eventId, eventName });
     }

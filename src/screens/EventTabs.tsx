@@ -6,6 +6,7 @@ import StatsScreen from "./StatsScreen";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons";
+import { usePresence } from "../hooks/usePresence";
 export type EventTabParamList = {
     People: { eventId: string };
     Polls: { eventId: string };
@@ -16,6 +17,7 @@ const Tab = createBottomTabNavigator<EventTabParamList>();
 
 export default function EventTabs({ route }: NativeStackScreenProps<RootStackParamList, "Event">) {
     const { eventId } = route.params;
+    usePresence(eventId);
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
