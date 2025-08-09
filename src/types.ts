@@ -28,3 +28,21 @@ export type Vote = {
     optionId: string; // options[].id
     votedAt: number;
 };
+// src/types.ts
+export type Chat = {
+    id: string;              // matchId (e.g., "<uidA>_<uidB>" sorted)
+    uids: [string, string];  // participants, sorted
+    createdAt: number;       // ms since epoch
+    lastMessage?: string;    // preview text
+    lastMessageAt?: number;  // ms since epoch
+};
+export type ChatMessage = {
+    id: string;      // doc id
+    from: string;    // uid
+    text: string;
+    createdAt: number;
+};
+export type ChatWithPeer = Chat & {
+    peerUid: string;     // the other user relative to auth.currentUser
+    peerName?: string;   // looked up from attendees
+};
