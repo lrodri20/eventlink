@@ -1,6 +1,29 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    "target": "es2017",
+    "lib": [
+      "dom",
+      "es2018"
+    ],
+    "jsx": "react",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "isolatedModules": true,
+    "allowJs": true,
+    "paths": {
+      "@firebase/auth": [
+        "./node_modules/@firebase/auth/dist/index.rn.d.ts"
+      ]
+    },
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": [
+      "react",
+      "react-native",
+      "jest"
+    ]
   }
 }
