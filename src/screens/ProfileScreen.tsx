@@ -112,7 +112,8 @@ export default function ProfileScreen({ route, navigation }: Props) {
                 lastMessageAt: 0,
             });
         }
-        navigation.getParent()?.navigate("Chat", {
+        // Replace Profile -> Chat so Back returns to EventTabs
+        navigation.replace("Chat", {
             eventId,
             matchId: chatId,
             peerUid: uid,
