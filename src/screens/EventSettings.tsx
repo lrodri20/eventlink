@@ -28,6 +28,7 @@ import {
     uploadBytes,
     getDownloadURL,
 } from "firebase/storage";
+import SecondaryButton from "../components/SecondaryButton";
 
 const db = getFirestore();
 
@@ -291,7 +292,7 @@ export default function EventSettings({ navigation, route }: Props) {
 
                 <PrimaryButton title="Save settings" onPress={save} />
                 <View style={{ height: 8 }} />
-                <PrimaryButton title="Leave this event" onPress={leaveEvent} />
+                <SecondaryButton title="Leave this event" onPress={leaveEvent} />
                 <View style={{ height: Platform.OS === "ios" ? 32 : 16 }} />
             </ScrollView>
 
