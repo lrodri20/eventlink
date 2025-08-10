@@ -7,16 +7,18 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    Modal,
+    Alert,
 } from "react-native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import TextField from "../components/TextField";
 import PrimaryButton from "../components/PrimaryButton";
 import { auth, db } from "../firebase";
 import { Poll } from "../types";
-import { collection, doc, onSnapshot, setDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { EventTabParamList } from "./EventTabs";
-
+import { Feather } from "@expo/vector-icons";
 function uid() {
     return Math.random().toString(36).slice(2, 9);
 }
@@ -30,7 +32,7 @@ export default function PollsScreen({
     const [polls, setPolls] = useState<Poll[]>([]);
     const maxOptions = 10; // align with your Firestore rules
     const headerHeight = useHeaderHeight();
-
+    const [editingPoll, setEditingPoll] = useState<Poll | null>(null);
     useEffect(() => {
         const q = collection(db, `events/${eventId}/polls`);
         const unsub = onSnapshot(q, (snap) => {
@@ -77,76 +79,99 @@ export default function PollsScreen({
     }
 
     return (
-        <KeyboardAvoidingView
+        <View
             style={{ flex: 1 }}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={headerHeight}
+            {...(Platform.OS === "ios"
+                ? { automaticallyAdjustKeyboardInsets: true }
+                : {})}
         >
-            <ScrollView
-                contentContainerStyle={{ padding: 16 }}
-                keyboardShouldPersistTaps="handled"
+            <KeyboardAvoidingView
+                style={{ flex: 1 }}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                keyboardVerticalOffset={headerHeight}
             >
-                <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 8 }}>
-                    Create a poll
-                </Text>
-                <TextField
-                    label="Question"
-                    value={question}
-                    onChangeText={setQuestion}
-                    placeholder="What did you like most?"
-                />
-
-                {options.map((opt, i) => (
-                    <View key={i} style={{ marginBottom: 8 }}>
-                        <TextField
-                            label={`Option ${String.fromCharCode(65 + i)}`}
-                            value={opt}
-                            onChangeText={(t) => setOptionText(i, t)}
-                            placeholder={
-                                i === 0 ? "e.g., Music" : i === 1 ? "e.g., Food" : "e.g., Speakers"
-                            }
-                        />
-                        {i >= 2 && (
-                            <TouchableOpacity
-                                onPress={() => removeOption(i)}
-                                style={styles.removeBtn}
-                            >
-                                <Text style={styles.removeTxt}>Remove option</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                ))}
-
-                <TouchableOpacity
-                    onPress={addOption}
-                    disabled={options.length >= maxOptions}
-                    style={[
-                        styles.addBtn,
-                        options.length >= maxOptions && { opacity: 0.5 },
-                    ]}
+                <ScrollView
+                    contentContainerStyle={{ padding: 16 }}
+                    keyboardShouldPersistTaps="handled"
                 >
-                    <Text style={styles.addTxt}>
-                        {options.length >= maxOptions ? "Max reached" : "+ Add option"}
+                    <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 8 }}>
+                        Create a poll
                     </Text>
-                </TouchableOpacity>
+                    <TextField
+                        label="Question"
+                        value={question}
+                        onChangeText={setQuestion}
+                        placeholder="What did you like most?"
+                    />
 
-                <PrimaryButton title="Create Poll" onPress={createPoll} />
+                    {options.map((opt, i) => (
+                        <View key={i} style={{ marginBottom: 8 }}>
+                            <TextField
+                                label={`Option ${String.fromCharCode(65 + i)}`}
+                                value={opt}
+                                onChangeText={(t) => setOptionText(i, t)}
+                                placeholder={
+                                    i === 0 ? "e.g., Music" : i === 1 ? "e.g., Food" : "e.g., Speakers"
+                                }
+                            />
+                            {i >= 2 && (
+                                <TouchableOpacity
+                                    onPress={() => removeOption(i)}
+                                    style={styles.removeBtn}
+                                >
+                                    <Text style={styles.removeTxt}>Remove option</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    ))}
 
-                <View style={{ height: 20 }} />
-                <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 8 }}>
-                    Live polls
-                </Text>
-                {polls.length === 0 ? (
-                    <Text>No polls yet.</Text>
-                ) : (
-                    polls.map((p) => <PollItem key={p.id} eventId={eventId} poll={p} />)
-                )}
-            </ScrollView>
-        </KeyboardAvoidingView>
+                    <TouchableOpacity
+                        onPress={addOption}
+                        disabled={options.length >= maxOptions}
+                        style={[
+                            styles.addBtn,
+                            options.length >= maxOptions && { opacity: 0.5 },
+                        ]}
+                    >
+                        <Text style={styles.addTxt}>
+                            {options.length >= maxOptions ? "Max reached" : "+ Add option"}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <PrimaryButton title="Create Poll" onPress={createPoll} />
+
+                    <View style={{ height: 20 }} />
+                    <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 8 }}>
+                        Live polls
+                    </Text>
+                    {polls.length === 0 ? (
+                        <Text>No polls yet.</Text>
+                    ) : (
+                        polls.map((p) => (
+                            <PollItem key={p.id} eventId={eventId} poll={p} onEdit={setEditingPoll} />
+                        ))
+                    )}
+                </ScrollView>
+            </KeyboardAvoidingView>
+            <EditPollModal
+                visible={!!editingPoll}
+                poll={editingPoll}
+                eventId={eventId}
+                onClose={() => setEditingPoll(null)}
+            />
+        </View >
     );
 }
 
-function PollItem({ eventId, poll }: { eventId: string; poll: Poll }) {
+function PollItem({
+    eventId,
+    poll,
+    onEdit,
+}: {
+    eventId: string;
+    poll: Poll;
+    onEdit: (p: Poll) => void;
+}) {
     const [myVote, setMyVote] = useState<string | null>(null);
     const [counts, setCounts] = useState<Record<string, number>>({});
 
@@ -166,13 +191,27 @@ function PollItem({ eventId, poll }: { eventId: string; poll: Poll }) {
         return unsub;
     }, [eventId, poll.id]);
 
+    const isCreator = auth.currentUser?.uid === poll.createdBy;
+
     async function vote(optionId: string) {
         await setDoc(
             doc(db, `events/${eventId}/polls/${poll.id}/votes/${auth.currentUser!.uid}`),
             { optionId, votedAt: Date.now() }
         );
     }
-
+    async function onDelete() {
+        if (!isCreator) return;
+        Alert.alert("Delete poll?", "This cannot be undone.", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                    await deleteDoc(doc(db, `events/${eventId}/polls/${poll.id}`));
+                },
+            },
+        ]);
+    }
     return (
         <View style={styles.poll}>
             <Text style={styles.question}>{poll.question}</Text>
@@ -185,17 +224,146 @@ function PollItem({ eventId, poll }: { eventId: string; poll: Poll }) {
                         style={[styles.opt, selected && { borderColor: "#3b82f6" }]}
                     >
                         <Text style={{ flex: 1 }}>{o.text}</Text>
-                        <VoteButton
-                            selected={selected}
-                            count={n}
+                        <PrimaryButton
+                            title={selected ? "Voted" : "Vote"}
                             onPress={() => vote(o.id)}
                         />
+                        <Text style={{ marginLeft: 8 }}>{n}</Text>
                     </View>
                 );
             })}
+
+            {isCreator && (
+                <View style={styles.actions}>
+                    <TouchableOpacity onPress={() => onEdit(poll)} style={[styles.actionBtn]}>
+                        <Text style={{ color: "#2563eb", fontWeight: "600" }}>Edit poll</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={onDelete}
+                        style={[styles.actionBtn]}
+                        accessibilityLabel="Delete poll"
+                    >
+                        <Text style={[styles.actionText, { color: "#ef4444" }]}>Delete</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
         </View>
     );
 }
+
+function EditPollModal({
+    visible,
+    poll,
+    eventId,
+    onClose,
+}: {
+    visible: boolean;
+    poll: Poll | null;
+    eventId: string;
+    onClose: () => void;
+}) {
+    const [question, setQuestion] = useState(poll?.question ?? "");
+    const [options, setOptions] = useState(poll?.options ?? []);
+    const [hasVotes, setHasVotes] = useState(false);
+    const maxOptions = 4;
+
+    useEffect(() => {
+        if (!poll) return;
+        setQuestion(poll.question);
+        setOptions(poll.options);
+        const unsub = onSnapshot(
+            collection(db, `events/${eventId}/polls/${poll.id}/votes`),
+            (snap) => setHasVotes(!snap.empty)
+        );
+        return unsub;
+    }, [poll?.id]);
+
+    function setOpt(i: number, text: string) {
+        setOptions((prev) => prev.map((o, idx) => (idx === i ? { ...o, text } : o)));
+    }
+
+    function addOpt() {
+        if (hasVotes || options.length >= maxOptions) return;
+        setOptions((prev) => [...prev, { id: uid(), text: "" }]);
+    }
+
+    function removeOpt(i: number) {
+        if (hasVotes || options.length <= 2) return;
+        setOptions((prev) => prev.filter((_, idx) => idx !== i));
+    }
+
+    async function save() {
+        if (!poll) return;
+        const filled = options.map((o) => ({ ...o, text: o.text.trim() })).filter((o) => o.text);
+        if (!question.trim() || filled.length < 2) return;
+
+        await updateDoc(doc(db, `events/${eventId}/polls/${poll.id}`), {
+            question: question.trim(),
+            options: hasVotes ? options : filled.slice(0, maxOptions), // keep IDs; rules enforce count when votes exist
+        });
+
+        onClose();
+    }
+
+    return (
+        <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+            <View style={styles.modalBackdrop}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === "ios" ? "padding" : undefined}
+                    style={styles.modalCard}
+                >
+                    <ScrollView
+                        contentContainerStyle={{ padding: 16 }}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        <Text style={{ fontWeight: "700", fontSize: 16, marginBottom: 8 }}>
+                            Edit poll
+                        </Text>
+
+                        <TextField label="Question" value={question} onChangeText={setQuestion} />
+
+                        {options.map((o, i) => (
+                            <View key={o.id} style={{ marginBottom: 8 }}>
+                                <TextField
+                                    label={`Option ${String.fromCharCode(65 + i)}`}
+                                    value={o.text}
+                                    onChangeText={(t) => setOpt(i, t)}
+                                />
+                                {!hasVotes && i >= 2 && (
+                                    <TouchableOpacity onPress={() => removeOpt(i)} style={{ marginTop: -4 }}>
+                                        <Text style={{ color: "#ef4444" }}>Remove option</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        ))}
+
+                        {!hasVotes && (
+                            <TouchableOpacity
+                                onPress={addOpt}
+                                disabled={options.length >= maxOptions}
+                                style={{ marginBottom: 8 }}
+                            >
+                                <Text style={{ color: "#2563eb", fontWeight: "600" }}>
+                                    {options.length >= maxOptions ? "Max 4 options" : "+ Add option"}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
+
+                        <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 16 }}>
+                            <TouchableOpacity onPress={onClose}>
+                                <Text>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={save}>
+                                <Text style={{ color: "#2563eb", fontWeight: "700" }}>Save</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
+            </View>
+        </Modal>
+    );
+}
+
 
 function VoteButton({
     selected,
@@ -255,7 +423,7 @@ const styles = StyleSheet.create({
     },
     addBtn: { alignSelf: "flex-start", marginBottom: 12 },
     addTxt: { color: "#2563eb", fontWeight: "600" },
-    removeBtn: { marginTop: -4, marginBottom: 8 },
+    removeBtn: { marginTop: 0, marginBottom: 8 },
     removeTxt: { color: "#ef4444" },
 
     // vote pill button
@@ -284,4 +452,32 @@ const styles = StyleSheet.create({
     voteCountUnselected: { backgroundColor: "#2563eb" },
     voteCountSelected: { backgroundColor: "rgba(255,255,255,0.2)" },
     voteCountText: { color: "#ffffff", fontWeight: "700" },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.35)",
+        justifyContent: "center",
+        padding: 16,
+    },
+    modalCard: {
+        backgroundColor: "white",
+        borderRadius: 18,
+        maxHeight: "85%",
+        overflow: "hidden",
+    },
+    actions: {
+        marginTop: 4,
+        flexDirection: "row",
+        justifyContent: "flex-start",
+        alignItems: "center",
+    },
+    actionBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 6,
+        paddingHorizontal: 4,
+    },
+    actionText: {
+        fontWeight: "600",
+        color: "#2563eb",
+    },
 });
