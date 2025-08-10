@@ -23,7 +23,8 @@
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-svg": "^13.14.1",
-    "victory-native": "^36.9.2"
+    "victory-native": "^36.9.2",
+    "expo-image-picker": "~16.1.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

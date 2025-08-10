@@ -1,28 +1,59 @@
 import React from "react";
-import { TextInput, View, Text, StyleSheet } from "react-native";
+import { View, Text, TextInput, StyleSheet, TextInputProps } from "react-native";
 
-export default function TextField({ label, value, onChangeText, placeholder, autoCapitalize = "sentences" }: {
+type Props = {
     label: string;
     value: string;
-    onChangeText: (t: string) => void;
+    onChangeText: (t: string) => void; // you can also use React.Dispatch<React.SetStateAction<string>>
     placeholder?: string;
-    autoCapitalize?: "none" | "sentences" | "words" | "characters";
-}) {
+    autoCapitalize?: TextInputProps["autoCapitalize"];
+    multiline?: boolean;          // <-- NEW
+    numberOfLines?: number;       // <-- optional helper
+    inputStyle?: any;             // <-- optional style override
+};
+
+export default function TextField({
+    label,
+    value,
+    onChangeText,
+    placeholder,
+    autoCapitalize = "sentences",
+    multiline = false,
+    numberOfLines = 1,
+    inputStyle,
+}: Props) {
     return (
-        <View style={{ marginBottom: 16 }}>
-            <Text style={styles.label}>{label}</Text>
+        <View style={{ marginBottom: 12 }}>
+            {!!label && <Text style={styles.label}>{label}</Text>}
             <TextInput
-                style={styles.input}
                 value={value}
                 onChangeText={onChangeText}
                 placeholder={placeholder}
                 autoCapitalize={autoCapitalize}
+                multiline={multiline}                               // <-- pass through
+                numberOfLines={multiline ? Math.max(numberOfLines, 3) : 1}
+                style={[
+                    styles.input,
+                    multiline && styles.inputMultiline,               // <-- top-aligned box
+                    inputStyle,
+                ]}
             />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    label: { marginBottom: 6, color: "#334155" },
-    input: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 10, padding: 12, fontSize: 16 }
+    label: { fontSize: 12, color: "#6b7280", marginBottom: 4, fontWeight: "600" },
+    input: {
+        borderWidth: 1,
+        borderColor: "#e5e7eb",
+        borderRadius: 12,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        backgroundColor: "#fff",
+    },
+    inputMultiline: {
+        minHeight: 100,
+        textAlignVertical: "top",
+    },
 });
