@@ -1,5 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { View, Text, FlatList, Alert } from "react-native";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import {
+    View,
+    Text,
+    FlatList,
+    Alert,
+    TouchableOpacity,
+    StyleSheet,
+    Platform,
+    ActionSheetIOS,
+} from "react-native";
 import { auth, db } from "../firebase";
 import { Attendee } from "../types";
 import {
@@ -25,6 +34,9 @@ type Props = CompositeScreenProps<
 
 type MatchMap = Record<string, { matchId: string }>; // peerUid -> matchId
 
+type FilterMode = "all" | "matched" | "liked" | "notLiked";
+type SortMode = "lastActive" | "openDate";
+
 export default function PeopleScreen({ route, navigation }: Props) {
     const { eventId } = route.params;
     const me = auth.currentUser!.uid;
@@ -32,6 +44,10 @@ export default function PeopleScreen({ route, navigation }: Props) {
     const [people, setPeople] = useState<Attendee[]>([]);
     const [myLikesTo, setMyLikesTo] = useState<Set<string>>(new Set());
     const [myMatches, setMyMatches] = useState<MatchMap>({});
+
+    // NEW: UI state for filter/sort
+    const [filterMode, setFilterMode] = useState<FilterMode>("all");
+    const [sortMode, setSortMode] = useState<SortMode>("lastActive");
 
     // Live attendees (seen in the last hour)
     useEffect(() => {
@@ -81,7 +97,7 @@ export default function PeopleScreen({ route, navigation }: Props) {
 
             setMyMatches(map);
 
-            // Ensure chats/{matchId} exists for every match (creates after matches doc, so rules allow it)
+            // Ensure chats/{matchId} exists
             await Promise.all(
                 toEnsure.map(async ({ id, uids }) => {
                     const chatRef = doc(db, `events/${eventId}/chats/${id}`);
@@ -100,10 +116,40 @@ export default function PeopleScreen({ route, navigation }: Props) {
         return unsub;
     }, [eventId, me]);
 
-    const others = useMemo(
-        () => people.filter((p) => p.uid !== me),
-        [people, me]
-    );
+    const others = useMemo(() => people.filter((p) => p.uid !== me), [people, me]);
+
+    // APPLY FILTER + SORT
+    const visible = useMemo(() => {
+        let base = others;
+
+        switch (filterMode) {
+            case "matched":
+                base = base.filter((p) => Boolean(myMatches[p.uid]));
+                break;
+            case "liked":
+                base = base.filter((p) => myLikesTo.has(p.uid));
+                break;
+            case "notLiked":
+                base = base.filter((p) => !myLikesTo.has(p.uid));
+                break;
+            case "all":
+            default:
+                break;
+        }
+
+        const getLastSeen = (p: any) => Number(p.lastSeenMs ?? 0);
+        const getJoined = (p: any) => Number(p.joinedAt ?? p.createdAt ?? 0);
+
+        const sorted = [...base].sort((a, b) => {
+            if (sortMode === "openDate") {
+                return getJoined(b) - getJoined(a); // newest join first
+            }
+            // lastActive default
+            return getLastSeen(b) - getLastSeen(a); // most recently seen first
+        });
+
+        return sorted;
+    }, [others, filterMode, sortMode, myLikesTo, myMatches]);
 
     /** Like someone → if reverse like exists, create match AND chat immediately */
     async function like(person: Attendee) {
@@ -129,7 +175,7 @@ export default function PeopleScreen({ route, navigation }: Props) {
                 { merge: true }
             );
 
-            // 2) Immediately ensure the chat exists (rules allow since match now exists)
+            // 2) Ensure the chat exists
             await setDoc(
                 doc(db, `events/${eventId}/chats/${matchId}`),
                 {
@@ -173,13 +219,77 @@ export default function PeopleScreen({ route, navigation }: Props) {
         });
     }
 
+    // --- UI helpers: action sheets for iOS, simple cycles for others ---
+    const filterLabel =
+        filterMode === "all"
+            ? "All"
+            : filterMode === "matched"
+                ? "Matched"
+                : filterMode === "liked"
+                    ? "Liked"
+                    : "Not liked";
+
+    const sortLabel = sortMode === "lastActive" ? "Last active" : "Open date";
+
+    const openFilterSheet = useCallback(() => {
+        if (Platform.OS === "ios") {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    title: "Filter people",
+                    options: ["All", "Matched", "Liked", "Not liked", "Cancel"],
+                    cancelButtonIndex: 4,
+                },
+                (i) => {
+                    if (i === 0) setFilterMode("all");
+                    if (i === 1) setFilterMode("matched");
+                    if (i === 2) setFilterMode("liked");
+                    if (i === 3) setFilterMode("notLiked");
+                }
+            );
+        } else {
+            // simple cycle on Android as a fallback
+            const order: FilterMode[] = ["all", "matched", "liked", "notLiked"];
+            const next = order[(order.indexOf(filterMode) + 1) % order.length];
+            setFilterMode(next);
+        }
+    }, [filterMode]);
+
+    const openSortSheet = useCallback(() => {
+        if (Platform.OS === "ios") {
+            ActionSheetIOS.showActionSheetWithOptions(
+                {
+                    title: "Sort people by",
+                    options: ["Last active", "Open date", "Cancel"],
+                    cancelButtonIndex: 2,
+                },
+                (i) => {
+                    if (i === 0) setSortMode("lastActive");
+                    if (i === 1) setSortMode("openDate");
+                }
+            );
+        } else {
+            setSortMode((s) => (s === "lastActive" ? "openDate" : "lastActive"));
+        }
+    }, []);
+
     return (
         <View style={{ flex: 1, padding: 16 }}>
             <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 8 }}>
                 Attendees
             </Text>
+
+            {/* Controls */}
+            <View style={styles.controlsRow}>
+                <TouchableOpacity style={styles.chip} onPress={openFilterSheet}>
+                    <Text style={styles.chipText}>Filter: {filterLabel}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.chip} onPress={openSortSheet}>
+                    <Text style={styles.chipText}>Sort: {sortLabel}</Text>
+                </TouchableOpacity>
+            </View>
+
             <FlatList
-                data={others}
+                data={visible}
                 keyExtractor={(item) => item.uid}
                 renderItem={({ item }) => (
                     <PersonCard
@@ -197,7 +307,25 @@ export default function PeopleScreen({ route, navigation }: Props) {
                     />
                 )}
                 ListEmptyComponent={<Text>No one else here yet.</Text>}
+                contentContainerStyle={{ paddingBottom: 24 }}
             />
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    controlsRow: {
+        flexDirection: "row",
+        gap: 8,
+        marginBottom: 8,
+    },
+    chip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: "#eef2ff",
+        borderRadius: 999,
+    },
+    chipText: {
+        fontWeight: "600",
+    },
+});
