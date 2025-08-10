@@ -30,15 +30,39 @@ export default function EventJoinScreen({ navigation }: NativeStackScreenProps<R
     }
 
     async function joinEvent(eventId: string, eventName: string) {
-        const uid = auth.currentUser!.uid;
-        await setDoc(doc(db, `events/${eventId}/attendees/${uid}`), {
-            uid,
-            displayName: auth.currentUser?.displayName ?? "Anon",
-            joinedAt: Date.now(),
-            lastSeen: serverTimestamp(),
-            lastSeenMs: Date.now(),
-            ttl: Timestamp.fromMillis(Date.now() + 5 * 60 * 1000) // match your hook
-        }, { merge: true });
+        const u = auth.currentUser!;
+        const uid = u.uid;
+
+        // 1) Ensure a user profile document exists and is tied to auth UID
+        await setDoc(
+            doc(db, "users", uid),
+            {
+                uid,                                   // <- explicit link to auth ID
+                displayName: u.displayName ?? "Anon",
+                email: u.email ?? null,
+                phone: u.phoneNumber ?? null,
+                photoURL: u.photoURL ?? null,
+                updatedAt: serverTimestamp(),
+            },
+            { merge: true }                          // create or update
+        );
+
+        // 2) Add/activate attendee record for this event
+        await setDoc(
+            doc(db, `events/${eventId}/attendees/${uid}`),
+            {
+                uid,
+                displayName: u.displayName ?? "Anon",
+                active: true,                          // <- important for isAttendee()
+                socialScope: "matches",                // default; user can change in Settings
+                joinedAt: Date.now(),
+                lastSeen: serverTimestamp(),
+                lastSeenMs: Date.now(),
+                ttl: Timestamp.fromMillis(Date.now() + 5 * 60 * 1000),
+            },
+            { merge: true }
+        );
+
         navigation.replace("Event", { eventId, eventName });
     }
 

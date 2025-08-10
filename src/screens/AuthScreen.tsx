@@ -4,7 +4,7 @@ import { useHeaderHeight } from "@react-navigation/elements";
 import PrimaryButton from "../components/PrimaryButton";
 import TextField from "../components/TextField";
 import { useAuth } from "../hooks/useAuth";
-import { setDisplayName } from "../firebase";
+import { setDisplayNameProfile } from "../firebase";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation/RootNavigator";
 
@@ -19,7 +19,7 @@ export default function AuthScreen({ navigation }: NativeStackScreenProps<RootSt
 
     async function save() {
         if (!name.trim()) return;
-        await setDisplayName(name.trim());
+        await setDisplayNameProfile(name.trim());
         navigation.replace("Join");
     }
 

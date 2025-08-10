@@ -14,7 +14,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import TextField from "../components/TextField";
 import PrimaryButton from "../components/PrimaryButton";
-import { auth } from "../firebase";
+import { auth, setDisplayNameProfile } from "../firebase";
 import {
     doc,
     onSnapshot,
@@ -162,14 +162,14 @@ export default function EventSettings({ navigation, route }: Props) {
                 attendeeRef,
                 {
                     uid,
-                    socialScope,
                     // keep them active if they’re here
+                    displayName,
                     active: true,
                     lastSettingsUpdate: serverTimestamp(),
                 },
                 { merge: true }
             );
-
+            setDisplayNameProfile(displayName);
             Alert.alert("Saved", "Your settings have been updated.");
         } catch (e: any) {
             Alert.alert("Couldn't save", e?.message ?? String(e));

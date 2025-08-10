@@ -35,7 +35,8 @@ export async function ensureAnonAuth() {
     }
 }
 
-export async function setDisplayName(name: string) {
+export async function setDisplayNameProfile(name: string) {
+    console.log("auth.currentUser", auth.currentUser);
     if (auth.currentUser) {
         await updateProfile(auth.currentUser, { displayName: name });
     }
