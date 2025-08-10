@@ -8,12 +8,14 @@ import ChatScreen from "../screens/ChatsScreen";
 import EventSettings from "../screens/EventSettings";
 import { View, Text, Pressable } from "react-native";
 import { Feather } from "@expo/vector-icons"; // flat settings icon
+import ProfileScreen from "../screens/ProfileScreen";
 
 export type RootStackParamList = {
     Auth: undefined;
     Join: undefined;
     Event: { eventId: string; eventName: string };
     Chat: { eventId: string; matchId: string; peerUid: string; peerName: string };
+    Profile: { eventId: string; uid: string };
     EventSettings: { eventId: string };
     EditProfile: undefined; // if you have it
 };
@@ -62,6 +64,11 @@ export default function RootNavigator() {
                     name="EventSettings"
                     component={EventSettings}
                     options={{ title: "Settings", presentation: "modal" }} // modal feels nice here
+                />
+                <Stack.Screen
+                    name="Profile"
+                    component={ProfileScreen}
+                    options={{ title: "Profile", presentation: "card" }}
                 />
             </Stack.Navigator>
         </NavigationContainer>

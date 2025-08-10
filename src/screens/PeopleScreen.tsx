@@ -188,6 +188,12 @@ export default function PeopleScreen({ route, navigation }: Props) {
                         liked={myLikesTo.has(item.uid)}
                         onLike={like}
                         onOpenChat={openChat}
+                        onPressName={(p) =>
+                            navigation.getParent()?.navigate("Profile", {
+                                eventId,
+                                uid: p.uid,
+                            })
+                        }
                     />
                 )}
                 ListEmptyComponent={<Text>No one else here yet.</Text>}

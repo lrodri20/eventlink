@@ -20,12 +20,14 @@ export default function PersonCard({
     liked,
     onLike,
     onOpenChat,
+    onPressName,
 }: {
     person: Attendee;
     matched?: boolean;
     liked?: boolean;
     onLike: (p: Attendee) => void;
     onOpenChat?: (p: Attendee) => void;
+    onPressName?: (p: Attendee) => void;
 }) {
     const joined = timeAgo(person.joinedAt);
     const seen = timeAgo(person.lastSeenMs ?? person.joinedAt);
@@ -38,10 +40,19 @@ export default function PersonCard({
                         {person.displayName.slice(0, 1).toUpperCase()}
                     </Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                <TouchableOpacity
+                    onPress={() => onPressName?.(person)}
+                    activeOpacity={0.7}
+                    style={{ flex: 1 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Open ${person.displayName}'s profile`}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
                     <Text style={styles.name}>{person.displayName}</Text>
-                    <Text style={styles.meta}>Joined {joined} · Last seen {seen}</Text>
-                </View>
+                    <Text style={styles.meta}>
+                        Joined {joined} · Last seen {seen}
+                    </Text>
+                </TouchableOpacity>
             </View>
 
             {/* Bio (optional) */}
