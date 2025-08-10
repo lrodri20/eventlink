@@ -105,19 +105,27 @@ export default function EventSettings({ navigation, route }: Props) {
     }, [eventId, uid]);
 
     async function pickImage() {
+        // Request permission
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
             Alert.alert("Permission required", "We need access to your photos.");
             return;
         }
+        const mediaTypesCompat =
+            (ImagePicker as any).MediaType?.image ??
+            (ImagePicker as any).MediaType?.image;
+        // NEW: use ImagePicker.MediaType.* instead of MediaTypeOptions
         const res = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: mediaTypesCompat,     // or [ImagePicker.MediaType.image]
             allowsEditing: true,
             aspect: [1, 1],
             quality: 0.9,
+            selectionLimit: 1,                            // iOS: ensure single selection
         });
+
         if (res.canceled || !res.assets?.length) return;
-        const uri = res.assets[0].uri;
+        const asset = res.assets[0];
+        const uri = asset.uri;
 
         // preview immediately
         setPhotoURL(uri);
@@ -125,10 +133,14 @@ export default function EventSettings({ navigation, route }: Props) {
         // upload to Storage
         try {
             const storage = getStorage();
-            const r = await fetch(uri);
-            const blob = await r.blob();
-            const key = `profiles/${uid}.jpg`; // one file per user
-            await uploadBytes(sRef(storage, key), blob);
+            const resp = await fetch(uri);
+            const blob = await resp.blob();
+
+            const key = `profiles/${uid}.jpg`; // keep .jpg if your Storage rules expect this path
+            // Optional: preserve contentType if available
+            const contentType = asset.mimeType ?? "image/jpeg";
+
+            await uploadBytes(sRef(storage, key), blob, { contentType });
             const url = await getDownloadURL(sRef(storage, key));
             setPhotoURL(url); // switch preview to CDN url
         } catch (e) {
@@ -136,6 +148,7 @@ export default function EventSettings({ navigation, route }: Props) {
             Alert.alert("Upload failed", "We couldn't upload your photo right now.");
         }
     }
+
 
     async function save() {
         if (!uid) return;
