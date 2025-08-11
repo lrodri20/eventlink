@@ -224,11 +224,11 @@ function PollItem({
                         style={[styles.opt, selected && { borderColor: "#3b82f6" }]}
                     >
                         <Text style={{ flex: 1 }}>{o.text}</Text>
-                        <PrimaryButton
-                            title={selected ? "Voted" : "Vote"}
+                        <VoteButton
+                            selected={selected}
+                            count={n}
                             onPress={() => vote(o.id)}
                         />
-                        <Text style={{ marginLeft: 8 }}>{n}</Text>
                     </View>
                 );
             })}
